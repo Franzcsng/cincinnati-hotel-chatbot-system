@@ -1,0 +1,105 @@
+@import './admin-shared.css';
+
+.admin-page {
+  max-width: 720px;
+}
+
+.upload-description {
+  color: var(--admin-muted);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.upload-dropzone {
+  position: relative;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone--active {
+  border-color: var(--admin-brick);
+  background-color: rgba(140, 59, 46, 0.04);
+}
+
+.upload-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-dropzone-title {
+  font-weight: 600;
+  color: var(--admin-text);
+}
+
+.upload-dropzone-sub {
+  margin-top: 0.35rem;
+  color: var(--admin-muted);
+  font-size: 0.9rem;
+}
+
+.upload-file-row {
+  margin-top: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-radius: 6px;
+  background-color: var(--admin-bg);
+}
+
+.upload-file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.upload-file-name {
+  font-weight: 600;
+  color: var(--admin-text);
+  font-size: 0.9rem;
+}
+
+.upload-file-size {
+  color: var(--admin-muted);
+  font-size: 0.8rem;
+}
+
+.upload-remove-btn {
+  border: none;
+  background: none;
+  color: var(--admin-danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.upload-remove-btn:hover {
+  text-decoration: underline;
+}
+
+.upload-submit-btn {
+  margin-top: 1.5rem;
+  border: none;
+  border-radius: 6px;
+  padding: 0.75rem 1.5rem;
+  background-color: var(--admin-brick);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.upload-submit-btn:disabled {
+  background-color: #d1d5db;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.upload-submit-btn:not(:disabled):hover {
+  background-color: #742f24;
+}

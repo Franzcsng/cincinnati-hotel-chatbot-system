@@ -1,0 +1,5 @@
+@import './admin-shared.css';
+
+.admin-page {
+  max-width: 960px;
+}

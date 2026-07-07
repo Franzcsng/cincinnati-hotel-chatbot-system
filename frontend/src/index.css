@@ -1,0 +1,64 @@
+:root {
+  /* Guest-facing brand palette */
+  --color-brick: #8c3b2e;
+  --color-river-blue: #2e4a5b;
+  --color-cream: #f2ead9;
+  --color-clay: #b5793b;
+  --color-sage: #7a8b6f;
+
+  /* Admin palette */
+  --admin-slate: #232a31;
+  --admin-bg: #f4f5f6;
+  --admin-white: #ffffff;
+  --admin-brick: #8c3b2e;
+  --admin-text: #2b2f33;
+  --admin-muted: #6b7280;
+  --admin-success: #2f9e44;
+  --admin-pending: #d99a1b;
+  --admin-danger: #c0392b;
+
+  /* Type */
+  --font-heading: "Playfair Display", Georgia, serif;
+  --font-body: "Source Sans 3", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--color-river-blue);
+  background-color: var(--color-cream);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}

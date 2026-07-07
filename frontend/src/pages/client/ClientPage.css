@@ -1,0 +1,35 @@
+.client-placeholder {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background-color: var(--color-cream);
+  text-align: center;
+  padding: 2rem;
+}
+
+.client-placeholder-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.85rem;
+  color: var(--color-clay);
+  font-weight: 600;
+}
+
+.client-placeholder h1 {
+  font-size: 2.25rem;
+  color: var(--color-river-blue);
+}
+
+.client-placeholder-link {
+  margin-top: 0.5rem;
+  color: var(--color-brick);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.client-placeholder-link:hover {
+  text-decoration: underline;
+}

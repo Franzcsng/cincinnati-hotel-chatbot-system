@@ -1,0 +1,78 @@
+.admin-shell {
+  min-height: 100vh;
+  display: flex;
+  background-color: var(--admin-bg);
+  color: var(--admin-text);
+}
+
+.admin-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  background-color: var(--admin-slate);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem 1.25rem;
+}
+
+.admin-logo {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  line-height: 1.25;
+  color: #fff;
+  text-decoration: none;
+}
+
+.admin-logo-sub {
+  display: block;
+  margin-top: 0.25rem;
+  margin-bottom: 2rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.admin-nav-link {
+  display: block;
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.admin-nav-link--active {
+  background-color: var(--admin-brick);
+  color: #fff;
+}
+
+.admin-exit-link {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+}
+
+.admin-exit-link:hover {
+  color: #fff;
+}
+
+.admin-main {
+  flex: 1;
+  padding: 2.5rem;
+  min-width: 0;
+}
