@@ -9,7 +9,9 @@ import statsRouter from './routes/stats.js'
 const app = express()
 const PORT = process.env.PORT || 4000
 
-app.use(cors())
+const allowedOrigins = ['http://localhost:5173', process.env.FRONTEND_URL].filter(Boolean)
+
+app.use(cors({ origin: allowedOrigins }))
 app.use(express.json())
 
 app.get('/health', (req, res) => {
