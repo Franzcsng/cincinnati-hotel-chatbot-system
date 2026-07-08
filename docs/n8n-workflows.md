@@ -7,23 +7,38 @@ triggered by webhooks the backend calls (see
 backend side of each call). This doc describes what each workflow actually
 does, based on their exported JSON.
 
-**Resolved:** the contact-request email used to only reach
-`recipient_emails[0]` and sent from Resend's sandbox domain. Both are
-fixed — the workflow now uses n8n's built-in SMTP email node with
-`toEmail` bound directly to the `recipient_emails` array (which
-n8n/JavaScript coerces to a comma-joined string, matching the multi-recipient
-format SMTP expects), sent from a real address instead of a sandbox
-domain. See [Contact Request Workflow](#contact-request-workflow-and-email-notification).
+**Resolved:**
+- The contact-request email used to only reach `recipient_emails[0]` and
+  sent from Resend's sandbox domain. Both fixed — the workflow now uses
+  n8n's built-in SMTP email node with `toEmail` bound directly to the
+  `recipient_emails` array (coerced to a comma-joined string, matching
+  the multi-recipient format SMTP expects), sent from a real address
+  instead of a sandbox domain. See
+  [Contact Request Workflow](#contact-request-workflow-and-email-notification).
+- `document_chunks.chunk_index` used to have a stray literal `"`
+  character in the field expression (`={{ $json.chunkIndex }}\"`), which
+  would have errored out the insert for every chunk. Fixed — the
+  expression is now exactly `={{ $json.chunkIndex }}`, correctly storing
+  each chunk's real position in the document. See
+  [PDF to Embedding Workflow](#pdf-to-embedding-workflow).
 
-**Open issue:** the attempted fix for `document_chunks.chunk_index`
-introduced a stray character —
-`"={{ $json.chunkIndex }}\""` has a literal `"` sitting outside the
-expression braces, so the value written is e.g. `0"` instead of `0`. Since
-this is an `int2` column, this will very likely error out the insert for
-every chunk, meaning **no chunks get saved at all** — worse than the
-original bug, which stored a wrong-but-harmless `0`. See
-[PDF to Embedding Workflow](#pdf-to-embedding-workflow) below. Fix: drop
-the trailing `\"` so the field value is exactly `={{ $json.chunkIndex }}`.
+**Open issue — check this in the n8n editor, not just here:** in the
+exported JSON, `CH - PDF to Embedding Workflow` and
+`CH - Contact Request Workflow and Email Notification` both have
+`"active": false` at the workflow level; only `CH - Hotel Chatbot
+Workflow` is `"active": true`. This lines up with `server/.env.local`:
+`PDF_UPLOAD_WEBHOOK_URL` and `CONTACT_REQUEST_WEBHOOK_URL` are still
+`/webhook-test/...` paths, while `CHAT_WEBHOOK_URL` was switched to a
+production `/webhook/...` path when that workflow got activated earlier
+(see the "fallback response" webhook-404 issue from earlier in this
+project). An n8n test webhook only responds while you have that
+workflow open in the editor with "Listen for test event" armed — it does
+**not** reliably answer requests from the live deployed app. If these
+two are still inactive, PDF uploads and contact-form submissions on the
+production site will silently fail (404 from n8n) any time you aren't
+sitting in the editor watching them. Activate both workflows in n8n, then
+switch their env vars on Railway from `/webhook-test/...` to the
+production `/webhook/...` path n8n gives you once active.
 
 ---
 
@@ -68,20 +83,14 @@ the trailing `\"` so the field value is exactly `={{ $json.chunkIndex }}`.
    - `document_id` — from the webhook body
    - `content` — the chunk text
    - `embedding_vector` — `data[0].embedding`
-   - `chunk_index` — `={{ $json.chunkIndex }}"` **(open issue: there's a
-     stray literal `"` character after the closing `}}`, outside the
-     expression braces — everything outside `{{ }}` in an n8n expression
-     is literal text to concatenate, so the value written is e.g. `0"`
-     rather than `0`. This is an `int2` column; that trailing quote will
-     very likely make Supabase reject the value outright, failing the
-     insert for every chunk on every upload — no chunks would be saved at
-     all. Remove the trailing `\"` so the expression is exactly
-     `={{ $json.chunkIndex }}` with nothing after it. This was an attempt
-     to fix an earlier version where this field read `data[0].index`
-     instead — the OpenAI embeddings response's per-call array index,
-     always `0` for a single-input call — so once the stray quote is
-     removed, this correctly uses the chunk's real position in the
-     document.)**
+   - `chunk_index` — `={{ $json.chunkIndex }}`, the chunk's real position
+     in the document (index 0). Originally this read `data[0].index` —
+     the OpenAI embeddings response's per-call array index, always `0`
+     for a single-input call, making every row's `chunk_index` `0`
+     regardless of actual position. A later fix attempt introduced a
+     stray literal `"` outside the expression braces
+     (`={{ $json.chunkIndex }}\"`), which would have failed the insert
+     entirely for every chunk. Both are now resolved.
 
 **No cleanup step exists in this workflow** — because there doesn't need
 to be one. `server/routes/documents.js` already deletes the previous
@@ -108,13 +117,17 @@ structured response.
    gets backfilled in step 7.
 2. **Generate Message Embedding** — same OpenAI embeddings call as the PDF
    workflow, embedding the guest's question text.
-3. **Match Message Embedding** (Postgres node, raw SQL) — calls a
-   Postgres function `match_document_chunks(embedding, 5)` (pgvector
-   similarity search, top 5) against `document_chunks`. The query wraps
-   this in `UNION ALL SELECT NULL ... WHERE NOT EXISTS (...)`, so it
-   **always returns at least one row** — an empty/null row when no chunks
-   match (e.g. no PDF has ever been uploaded) — rather than an empty
-   result set that could break the next step.
+3. **Match Message Embedding** (Postgres node, raw SQL) — calls
+   `match_document_chunks(embedding, 5)`, top 5 chunks by cosine
+   similarity, scoped to the current active document only, excluding
+   anything below a 0.40 similarity floor — full function definition and
+   why those specific behaviors matter in
+   [architecture.md](./architecture.md#match_document_chunks--postgres-function-not-an-app-table).
+   The query wraps the call in `UNION ALL SELECT NULL ... WHERE NOT
+   EXISTS (...)`, so it **always returns at least one row** — an
+   empty/null row when nothing clears the similarity floor (e.g. no PDF
+   uploaded yet, or a genuinely off-topic question) — rather than an
+   empty result set that could break the next step.
 4. **Build String Context** (Code node) — concatenates the matched
    chunks' `content` fields, separated by `\n\n---\n\n`, into one
    `context` string passed to the model.

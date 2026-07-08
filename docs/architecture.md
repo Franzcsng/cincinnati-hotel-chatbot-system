@@ -89,6 +89,66 @@ cincinnati-hotel/
 assistant at a time. Uploading a new PDF retires the previous one (see
 below) so stale embeddings never coexist with fresh ones.
 
+### `match_document_chunks()` — Postgres function, not an app table
+
+The RAG retrieval step (see [Chat flow](#chat-flow) and
+[n8n-workflows.md](./n8n-workflows.md#hotel-chatbot-workflow)) calls this
+function directly via a raw SQL node in n8n — it's not exposed through
+any Express route or Supabase JS client call in this app:
+
+```sql
+CREATE OR REPLACE FUNCTION match_document_chunks(
+	query_embedding vector(1536),
+	match_count integer
+	)
+RETURNS TABLE (
+	id uuid,
+	document_id uuid,
+	content text,
+	similarity float
+	)
+LANGUAGE sql STABLE
+AS $$
+SELECT
+	dc.id,
+	dc.document_id,
+	dc.content,
+	1 - (dc.embedding_vector <=> query_embedding) AS similarity
+FROM document_chunks dc
+JOIN documents d
+	ON dc.document_id = d.id
+WHERE
+	 d.is_active = true
+	AND (1 - (dc.embedding_vector <=> query_embedding)) >= 0.40
+ORDER BY dc.embedding_vector <=> query_embedding
+LIMIT match_count;
+$$;
+```
+
+Requires the `pgvector` extension enabled on the Supabase project (for
+the `vector` column type and the `<=>` cosine-distance operator).
+
+Three things worth knowing about this function's behavior, since they
+directly shape what the assistant can and can't answer:
+- **It joins to `documents` and filters `is_active = true`.** Retrieval
+  is automatically scoped to the current active document's chunks only —
+  a second layer of protection on top of `server/routes/documents.js`
+  deleting the previous document's chunks on upload (see
+  [PDF upload flow](#pdf-upload-flow)). Even if a stale chunk somehow
+  survived, this join would still exclude it from search results.
+- **`>= 0.40` is a similarity floor**, not just a ranking — chunks below
+  40% cosine similarity are excluded entirely, not merely ranked lower.
+  This is what makes the "I don't have that information" fallback
+  possible: a question genuinely unrelated to any chunk's content returns
+  zero rows rather than the "best available but irrelevant" match. This
+  threshold is a tunable — too low risks the assistant reaching for
+  weakly-related context (hallucination-adjacent); too high risks it
+  saying "I don't know" to questions the PDF actually answers.
+- **`similarity` is `1 - cosine_distance`**, i.e. genuine cosine
+  similarity (not L2/Euclidean distance) — pgvector's `<=>` operator
+  returns cosine *distance*, so this subtracts from 1 to get a
+  similarity score.
+
 ### `chat_sessions`
 
 | Column | Type | Notes |

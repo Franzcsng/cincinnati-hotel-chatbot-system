@@ -9,12 +9,21 @@ from the code.
 
 ## Contents
 
-- [setup.md](./setup.md) — prerequisites, install, running the app locally
+- [setup.md](./setup.md) — Supabase schema/function setup, n8n workflow import, install, running, testing, and extending the system
 - [architecture.md](./architecture.md) — tech stack, folder structure, routes, request flows
 - [api.md](./api.md) — backend API reference
 - [n8n-workflows.md](./n8n-workflows.md) — what the three n8n workflows actually do (PDF chunking, chat RAG, contact-request email), node-by-node
+- [deployment.md](./deployment.md) — Vercel + Railway setup, env vars per platform, CORS, the deploy bugs hit and how they were fixed
 - [environment-variables.md](./environment-variables.md) — every env var, what it's for, where it's used
 - [branding.md](./branding.md) — brand voice, color palettes, typography
+
+## Live deployment
+
+- Frontend: <https://cincinnati-hotel-chatbot-system.vercel.app>
+- Backend: `https://cincinnati-hotel-chatbot-system-production.up.railway.app`
+
+Both auto-deploy from `main`. See [deployment.md](./deployment.md) for
+the full setup.
 
 ## Current status
 
@@ -45,15 +54,25 @@ respective n8n workflows. The backend only reads `messages` (filtered to
 `role = 'client'`) for `GET /api/stats`. See
 [architecture.md](./architecture.md#database-supabase).
 
-**Resolved:** the contact-request email used to only reach
-`recipient_emails[0]` and sent from Resend's sandbox domain — both fixed
-by switching to n8n's SMTP email node with a real sender address and the
-full recipient list. See [n8n-workflows.md](./n8n-workflows.md).
+**Resolved:**
+- Contact-request email used to only reach `recipient_emails[0]` and sent
+  from Resend's sandbox domain — fixed via n8n's SMTP email node with a
+  real sender address and the full recipient list.
+- `document_chunks.chunk_index` was always `0`, then briefly broken again
+  by a stray character during the fix — both resolved, now correctly
+  stores each chunk's real position.
 
-**Open issue to fix before submission:** an attempted fix for
-`document_chunks.chunk_index` (previously always `0`) left a stray `"`
-character in the field expression, which will very likely error out the
-Supabase insert for every chunk — meaning **no chunks get saved at all**
-on the next PDF upload. See
-[n8n-workflows.md](./n8n-workflows.md#pdf-to-embedding-workflow) for the
-exact fix (remove the trailing `\"`).
+See [n8n-workflows.md](./n8n-workflows.md) for detail on both.
+
+**Open issue to verify before submission:** in the workflow JSON,
+`CH - PDF to Embedding Workflow` and
+`CH - Contact Request Workflow and Email Notification` are both
+`"active": false` in n8n — only the chat workflow is active. An inactive
+workflow's webhook only responds while you're in the n8n editor with
+"Listen for test event" armed, not reliably from the live deployed app.
+If still inactive, **PDF uploads and contact-form submissions on the
+production site will silently fail** unless you happen to be watching
+the n8n editor at that exact moment. See
+[n8n-workflows.md](./n8n-workflows.md) for the fix (activate both, then
+update `PDF_UPLOAD_WEBHOOK_URL`/`CONTACT_REQUEST_WEBHOOK_URL` on Railway
+to the resulting production `/webhook/...` paths).

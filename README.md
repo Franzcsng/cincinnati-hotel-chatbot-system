@@ -7,11 +7,17 @@ admin-uploaded PDF knowledge base for an AI assistant.
 - **Frontend:** `frontend/` — React 19 + Vite
 - **Backend:** `server/` — Node.js + Express
 
+## Live
+
+- App: <https://cincinnati-hotel-chatbot-system.vercel.app>
+- API: `https://cincinnati-hotel-chatbot-system-production.up.railway.app`
+
 ## Documentation
 
 Full project documentation lives in [`docs/`](./docs/README.md), including
-setup instructions, architecture, API reference, environment variables, and
-the brand/design system. Keep it updated as the project evolves.
+setup instructions, architecture, API reference, deployment, environment
+variables, and the brand/design system. Keep it updated as the project
+evolves.
 
 ## Quick start
 
