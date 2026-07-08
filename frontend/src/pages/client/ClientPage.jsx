@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import ChatWidget from '../../components/ChatWidget.jsx'
 import './ClientPage.css'
 
@@ -5,7 +6,15 @@ function ClientPage() {
   return (
     <div className="client-page">
       <section className="hero">
-        <div className="hero-image-placeholder">Hero image placeholder</div>
+        <div className="hero-bg" />
+
+        <header className="client-header">
+          <span className="client-header-logo">The Cincinnati Hotel</span>
+          <Link to="/" className="client-header-exit">
+            Exit to Landing Page
+          </Link>
+        </header>
+
         <div className="hero-content">
           <p className="hero-eyebrow">Downtown Cincinnati &middot; Over-the-Rhine</p>
           <h1 className="hero-title">The Cincinnati Hotel</h1>
