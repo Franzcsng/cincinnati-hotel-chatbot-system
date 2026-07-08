@@ -33,17 +33,18 @@ cincinnati-hotel/
 │           │   └── ClientPage.jsx        # hero banner + chat section
 │           └── admin/
 │               ├── AdminLayout.jsx       # sidebar shell, <Outlet/>
-│               ├── DashboardPage.jsx     # placeholder
-│               └── UploadPdfPage.jsx     # PDF upload UI
+│               ├── DashboardPage.jsx     # stats: KPI tiles + questions-by-topic
+│               └── UploadPdfPage.jsx     # PDF upload UI + active document display
 └── server/
     ├── index.js               # Express app entrypoint
     ├── loadEnv.js              # loads .env.local before anything else
     ├── lib/
     │   └── supabaseClient.js  # Supabase client (service-role key)
     └── routes/
-        ├── documents.js       # POST /api/documents/upload
+        ├── documents.js       # GET /api/documents/active, POST /api/documents/upload
         ├── chat.js            # POST /api/chat/sessions, /api/chat/messages
-        └── contactRequests.js # POST /api/contact-requests
+        ├── contactRequests.js # POST /api/contact-requests
+        └── stats.js           # GET /api/stats
 ```
 
 ## Frontend routes
@@ -52,8 +53,8 @@ cincinnati-hotel/
 |---|---|---|
 | `/` | `LandingPage` | Guest / Admin selector |
 | `/client` | `ClientPage` | Hero banner + hotel assistant chat |
-| `/admin` | `AdminLayout` > `DashboardPage` | Placeholder |
-| `/admin/upload` | `AdminLayout` > `UploadPdfPage` | Live upload flow |
+| `/admin` | `AdminLayout` > `DashboardPage` | Live stats: total sessions, questions asked, answer rate, questions-by-topic bar list |
+| `/admin/upload` | `AdminLayout` > `UploadPdfPage` | Live upload flow + active document name/date |
 
 ## Database (Supabase)
 
@@ -90,6 +91,48 @@ below) so stale embeddings never coexist with fresh ones.
 | `started_at` | `timestamptz` | Set when the row is created |
 | `ended_at` | `timestamptz` | Nullable — not currently set by any code path |
 
+### `messages`
+
+Written directly by the n8n chat workflow (**not** by this app's Express
+backend — the backend only reads it, for stats). Each Q&A exchange
+produces **two rows**, one per `role`, with `topic`/`answered` set
+identically on both:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` | Primary key |
+| `session_id` | `uuid` | FK to `chat_sessions.id` |
+| `role` | `text` | `'client'` (the guest's question) or `'assistant'` (the reply); nullable |
+| `message` | `text` | The question or the reply text; nullable |
+| `topic` | `text` | Nullable. Casing is inconsistent from n8n (`"room rates"` vs `"Room rates"` both occur) — `GET /api/stats` normalizes this, see below |
+| `answered` | `bool` | Nullable |
+| `created_at` | `timestamptz` | Nullable |
+
+`GET /api/stats` (see [Statistics flow](#statistics-flow)) filters to
+`role = 'client'` when counting questions/topics — querying both roles
+would double-count every exchange, since topic/answered are duplicated
+onto the assistant row too.
+
+### `contact_requests`
+
+Written directly by the n8n contact-request workflow (not by this app's
+Express backend — `contactRequests.js` only forwards to the webhook, it
+never writes to Supabase itself).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` | Primary key |
+| `session_id` | `uuid` | FK to `chat_sessions.id` |
+| `name` | `text` | |
+| `phone` | `text` | Nullable |
+| `email` | `text` | Nullable |
+| `question` | `text` | Nullable |
+| `topic` | `text` | Nullable |
+| `created_at` | `timestamptz` | Nullable |
+
+Not currently queried by this app anywhere (no admin view of contact
+requests exists yet — only the stats dashboard).
+
 ## PDF upload flow
 
 Triggered by the admin Upload PDF page (`POST /api/documents/upload`,
@@ -110,7 +153,15 @@ detailed in [api.md](./api.md)):
    asynchronously. A webhook failure is logged but does not fail the upload
    request — the document record has already been created at that point.
 6. Backend responds with the new document record; frontend shows a
-   success/error state.
+   success/error state and refetches the active document (see below).
+
+## Active document lookup
+
+`GET /api/documents/active` returns the `documents` row where
+`is_active = true` (or `{ document: null }` if none exists yet — e.g. before
+the first upload). The Upload PDF page calls this on mount and again after
+every successful upload, so the admin always sees which file the assistant
+is currently answering from, not just a "success" toast that fades.
 
 ## Chat flow
 
@@ -150,12 +201,49 @@ Triggered by the `ChatWidget` on the client landing page
    Submitting calls `POST /api/contact-requests` with
    `{ session_id, name, email, phone, topic, question }`, where `topic`
    comes from the triggering reply and `question` is the guest's message
-   that prompted it. The backend forwards this to
-   `CONTACT_REQUEST_WEBHOOK_URL` (n8n) — currently a placeholder env var
-   with no real workflow behind it yet. On success the form is replaced
+   that prompted it. The backend adds `recipient_emails` — parsed
+   server-side from the comma-separated `CONTACT_REQUEST_RECIPIENT_EMAILS`
+   env var, not guest input — and forwards the combined payload to
+   `CONTACT_REQUEST_WEBHOOK_URL` (n8n). On success the form is replaced
    with a thank-you note, scoped to that message only.
-7. No message or contact-request content is persisted in Supabase by our
-   backend (`chat_sessions` has no messages column) — messages live only in
-   frontend component state for the duration of the page visit. Whatever
-   the n8n workflows do with the data server-side is outside this app's
-   database writes.
+7. Neither this app's Express backend nor its frontend persists the
+   conversation anywhere — no message content, no transcript. The chat
+   transcript in the browser lives only in frontend component state for
+   the duration of the page visit. **The n8n chat workflow itself** writes
+   two `messages` rows per exchange (`role='client'` and `role='assistant'`)
+   directly to Supabase as part of processing the webhook call — see the
+   `messages` table above. That's what `GET /api/stats` reads from.
+   Similarly, contact-request content is written to `contact_requests` by
+   **the n8n contact-request workflow**, not by this app.
+
+## Statistics flow
+
+`GET /api/stats` powers the admin Dashboard page, reading tables that n8n
+writes to (see [Database](#database-supabase) above) — this app's backend
+never writes to `messages` or `contact_requests` itself:
+
+1. `total_sessions` — a `count`-only query (`head: true`) against
+   `chat_sessions`, so it never fetches session rows just to count them.
+2. Backend fetches `messages` rows **filtered to `role = 'client'`** (small
+   dataset for this app's scale — no need for a `GROUP BY` RPC) and reduces
+   their `topic`/`answered` values in Node into `total_questions`,
+   `answered_questions`, and `questions_by_topic` (topic + count, sorted
+   descending). Filtering to one role is required, not optional —
+   `messages` has two rows per exchange with the same topic/answered value,
+   so querying both roles would double every count. Topics are normalized
+   with title-casing before grouping (blank/null → `"Uncategorized"`) since
+   n8n's topic classification isn't consistently cased — `"room rates"` and
+   `"Room rates"` are the same topic and were observed splitting into two
+   rows in production data before this normalization was added.
+3. The Dashboard page polls this endpoint every 8 seconds while mounted
+   (plus an immediate fetch on mount) — simple polling rather than Supabase
+   Realtime/websocket subscriptions, since that would require exposing a
+   Supabase anon client and RLS policies to the frontend for read access,
+   which doesn't exist yet (see [environment-variables.md](./environment-variables.md)
+   — only `SUPABASE_SECRET_KEY` is configured, and only server-side).
+   Polling meets "updates immediately after each chat session" closely
+   enough for this app's scale without that added surface area.
+4. Rendered as a KPI row (total sessions, questions asked, answer rate) plus
+   a horizontal bar list for `questions_by_topic` — single-hue (brick),
+   magnitude-encoded by bar length, sorted descending, count labeled at
+   each bar's tip.

@@ -20,20 +20,26 @@ from the code.
 **Built:**
 - Landing page with Guest / Admin selection
 - Admin shell (sidebar nav: Dashboard, Upload PDF Document)
-- Admin Dashboard — placeholder only
-- Admin Upload PDF page — full upload flow wired to the backend
+- Admin Dashboard — live stats (total chat sessions, questions asked,
+  answer rate, questions-by-topic bar breakdown), polling every 8s — see
+  [architecture.md](./architecture.md#statistics-flow)
+- Admin Upload PDF page — full upload flow wired to the backend, plus the
+  currently active document's filename/upload date
 - Client page — hero banner + hotel assistant chat widget, fully wired
   end-to-end (session creation, message send, Markdown-rendered assistant
   replies, and a "connect with our team" contact form that appears on
   fallback replies) — see [architecture.md](./architecture.md#chat-flow)
-- Backend: `POST /api/documents/upload`, `POST /api/chat/sessions`,
-  `POST /api/chat/messages`, `POST /api/contact-requests` (see [api.md](./api.md))
+- Backend: `GET /api/documents/active`, `POST /api/documents/upload`,
+  `POST /api/chat/sessions`, `POST /api/chat/messages`,
+  `POST /api/contact-requests`, `GET /api/stats` (see [api.md](./api.md))
 
 **Explicitly out of scope for now:**
 - No authentication/authorization on `/admin` or `/client` routes — anyone can
   navigate there directly. This is intentional for the current build phase.
 - No booking/rooms content on the client page yet.
-- No admin dashboard content yet.
-- `CONTACT_REQUEST_WEBHOOK_URL` is a placeholder — the n8n workflow for
-  contact requests hasn't been built yet, so `POST /api/contact-requests`
-  currently 500s in a real (non-mocked) run.
+
+**Note on data ownership:** this app's Express backend never writes to
+`messages` or `contact_requests` — both are written directly by their
+respective n8n workflows. The backend only reads `messages` (filtered to
+`role = 'client'`) for `GET /api/stats`. See
+[architecture.md](./architecture.md#database-supabase).

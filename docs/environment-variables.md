@@ -11,7 +11,8 @@ tracks the *names* and their purpose so the project stays reproducible.
 | `PORT` | Port the Express server listens on. Optional, defaults to `4000`. |
 | `PDF_UPLOAD_WEBHOOK_URL` | n8n webhook hit after a successful PDF upload; triggers chunking/embedding. |
 | `CHAT_WEBHOOK_URL` | n8n webhook hit on every chat message; returns the assistant's reply. |
-| `CONTACT_REQUEST_WEBHOOK_URL` | n8n webhook hit when a guest submits the "connect with our team" contact form. **Placeholder — not yet set to a real workflow URL**, so `POST /api/contact-requests` currently 500s until it's configured. |
+| `CONTACT_REQUEST_WEBHOOK_URL` | n8n webhook hit when a guest submits the "connect with our team" contact form. |
+| `CONTACT_REQUEST_RECIPIENT_EMAILS` | Comma-separated list of email addresses the n8n contact-request workflow should notify. Parsed server-side (`server/routes/contactRequests.js`) into a `recipient_emails` array before being sent to the webhook — whitespace around each address is trimmed and empty entries are dropped. Optional; an unset/empty value sends `recipient_emails: []`. |
 | `SUPABASE_URL` | Supabase project URL. |
 | `SUPABASE_PUBLISHABLE_KEY` | Supabase publishable (anon) key. Not currently used by the backend, kept for parity/future use. |
 | `SUPABASE_SECRET_KEY` | Supabase service-role key — used server-side for Storage and DB writes that bypass RLS. **Backend only, never expose to the frontend.** |

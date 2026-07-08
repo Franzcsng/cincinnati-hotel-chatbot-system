@@ -17,6 +17,30 @@ Health check.
 
 ---
 
+## `GET /api/documents/active`
+
+Returns the currently active document, if any. Used by the Upload PDF page
+to show the admin which file the assistant is answering from.
+
+**Response `200`**
+```json
+{
+  "document": {
+    "id": "uuid",
+    "filename": "hotel-info.pdf",
+    "uploaded_at": "2026-07-07T00:00:00.000Z"
+  }
+}
+```
+`document` is `null` if no document has ever been uploaded.
+
+**Response `500`** — database lookup failure
+```json
+{ "error": "Failed to look up active document" }
+```
+
+---
+
 ## `POST /api/documents/upload`
 
 Uploads a new PDF to serve as the AI assistant's knowledge base. Retires
@@ -101,8 +125,11 @@ visitor's first chat message — see
 
 ## `POST /api/chat/messages`
 
-Forwards a chat message to the n8n chat workflow. Does not persist message
-content anywhere.
+Forwards a chat message to the n8n chat workflow and relays back its
+response. This route itself never writes to Supabase — the n8n workflow
+writes two `messages` rows (`role='client'` and `role='assistant'`) directly
+as part of processing the webhook call. See
+[architecture.md](./architecture.md#messages).
 
 **Request**: `application/json`
 
@@ -149,8 +176,10 @@ but not currently used by the frontend.
 
 Submits a guest's "connect with our team" request, shown when a chat reply
 has `show_contact_form: true`. Forwards to `CONTACT_REQUEST_WEBHOOK_URL`
-(n8n). **`CONTACT_REQUEST_WEBHOOK_URL` is currently a placeholder — this
-route 500s until it's set to a real workflow URL.**
+(n8n) — this route never writes to Supabase itself; the n8n workflow
+writes the `contact_requests` row (see
+[architecture.md](./architecture.md#contact_requests)) and handles
+notifying `recipient_emails`.
 
 **Request**: `application/json`
 
@@ -168,6 +197,24 @@ route 500s until it's set to a real workflow URL.**
 { "status": "submitted" }
 ```
 
+**Side effect**: forwards to `CONTACT_REQUEST_WEBHOOK_URL` with:
+```json
+{
+  "session_id": "uuid",
+  "name": "Jane Guest",
+  "email": "jane@example.com",
+  "phone": null,
+  "topic": "Dining",
+  "question": "Do you have a rooftop restaurant?",
+  "recipient_emails": ["frontdesk@example.com", "manager@example.com"]
+}
+```
+`recipient_emails` is server config, not guest input — parsed from
+`CONTACT_REQUEST_RECIPIENT_EMAILS` (see
+[environment-variables.md](./environment-variables.md)), not part of the
+request body above. It's who the n8n workflow should notify about this
+request.
+
 **Response `400`** — missing `session_id`, `name`, or `email`
 ```json
 { "error": "session_id, name, and email are required" }
@@ -181,4 +228,37 @@ route 500s until it's set to a real workflow URL.**
 **Response `502`** — webhook unreachable or returned a non-2xx status
 ```json
 { "error": "Failed to submit your request" }
+```
+
+---
+
+## `GET /api/stats`
+
+Powers the admin Dashboard page. See
+[architecture.md](./architecture.md#statistics-flow) for how the numbers
+are derived.
+
+**Response `200`**
+```json
+{
+  "total_sessions": 24,
+  "total_questions": 41,
+  "answered_questions": 33,
+  "questions_by_topic": [
+    { "topic": "Rooms", "count": 12 },
+    { "topic": "Dining", "count": 8 },
+    { "topic": "Parking", "count": 5 }
+  ]
+}
+```
+`questions_by_topic` is sorted descending by `count`. Derived from
+`messages` rows where `role = 'client'` (see
+[architecture.md](./architecture.md#statistics-flow) for why that filter
+matters — the table has two rows per exchange). Topics are normalized with
+title-casing before grouping (`"room rates"` and `"Room rates"` count as
+one topic) and a blank/null `topic` is bucketed under `"Uncategorized"`.
+
+**Response `500`** — database lookup failure
+```json
+{ "error": "Failed to load statistics" }
 ```
