@@ -17,6 +17,21 @@ const upload = multer({
 
 const router = Router()
 
+router.get('/active', async (req, res) => {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('id, filename, uploaded_at')
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Failed to look up active document:', error)
+    return res.status(500).json({ error: 'Failed to look up active document' })
+  }
+
+  res.status(200).json({ document: data })
+})
+
 router.post(
   '/upload',
   (req, res, next) => {
