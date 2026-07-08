@@ -13,6 +13,12 @@
 No authentication/authorization layer exists yet anywhere in the app —
 this is a deliberate, temporary simplification for the current build phase.
 
+This app's Express backend is a thin proxy in front of three n8n
+workflows — it never calls OpenAI, never runs embedding search, and never
+sends email. See [n8n-workflows.md](./n8n-workflows.md) for exactly what
+each workflow does node-by-node; this doc covers the app-side half of each
+flow.
+
 ## Folder structure
 
 ```
@@ -111,7 +117,8 @@ identically on both:
 `GET /api/stats` (see [Statistics flow](#statistics-flow)) filters to
 `role = 'client'` when counting questions/topics — querying both roles
 would double-count every exchange, since topic/answered are duplicated
-onto the assistant row too.
+onto the assistant row too. Full node-by-node detail on how these rows
+get written: [n8n-workflows.md](./n8n-workflows.md#hotel-chatbot-workflow).
 
 ### `contact_requests`
 
@@ -131,7 +138,12 @@ never writes to Supabase itself).
 | `created_at` | `timestamptz` | Nullable |
 
 Not currently queried by this app anywhere (no admin view of contact
-requests exists yet — only the stats dashboard).
+requests exists yet — only the stats dashboard). Written by the n8n
+contact-request workflow alongside an AI-summarized email — see
+[n8n-workflows.md](./n8n-workflows.md#contact-request-workflow-and-email-notification)
+for the two known issues in that email step (recipient list truncated to
+one address, sandbox sender domain) that should be fixed before relying
+on it.
 
 ## PDF upload flow
 
@@ -148,10 +160,13 @@ detailed in [api.md](./api.md)):
 4. Backend inserts a new `documents` row (`is_active = true`).
 5. Backend generates a 1-hour signed URL for the uploaded file and POSTs
    `{ document_id, filename, storage_path, signed_url }` to the
-   `PDF_UPLOAD_WEBHOOK_URL` (n8n), which is expected to download the PDF via
-   `signed_url`, chunk it, and populate `document_chunks` with embeddings
-   asynchronously. A webhook failure is logged but does not fail the upload
-   request — the document record has already been created at that point.
+   `PDF_UPLOAD_WEBHOOK_URL` (n8n), which downloads the PDF via
+   `signed_url`, chunks it (900 chars/chunk, 100-char overlap — see
+   [n8n-workflows.md](./n8n-workflows.md#pdf-to-embedding-workflow) for
+   the exact chunking logic), and populates `document_chunks` with
+   embeddings asynchronously. A webhook failure is logged but does not
+   fail the upload request — the document record has already been
+   created at that point.
 6. Backend responds with the new document record; frontend shows a
    success/error state and refetches the active document (see below).
 
@@ -186,14 +201,15 @@ Triggered by the `ChatWidget` on the client landing page
    `{ reply: <webhook JSON> }`.
 5. The n8n workflow returns
    `{ session_id, agent_message, topic, is_answered, show_contact_form }`.
-   The frontend reads `reply.agent_message` and renders it as a Markdown
-   chat bubble via `react-markdown` (the system prompt instructs the agent
-   to format lists/prices in Markdown, and to fall back to a fixed
-   "connect with our team" message with `show_contact_form: true` when a
-   hotel-related question isn't covered by the knowledge base — vs. a
-   plain decline with `show_contact_form: false` for off-topic questions).
-   A typing indicator shows while the request is in flight; a missing/empty
-   `agent_message` or a failed request shows an error banner instead.
+   `topic` is one of 16 fixed categories the RAG agent classifies every
+   question into (even unanswered ones get a real topic — only genuinely
+   off-topic questions get `"Unrelated"`); see
+   [n8n-workflows.md](./n8n-workflows.md#hotel-chatbot-workflow) for the
+   full list and the exact fallback-message logic. The frontend reads
+   `reply.agent_message` and renders it as a Markdown chat bubble via
+   `react-markdown`. A typing indicator shows while the request is in
+   flight; a missing/empty `agent_message` or a failed request shows an
+   error banner instead.
 6. If that reply has `show_contact_form: true`, a `ContactForm` (name,
    email, phone) renders directly under it — attached to that specific
    message, not a global widget state, so multiple fallback replies across
@@ -205,7 +221,10 @@ Triggered by the `ChatWidget` on the client landing page
    server-side from the comma-separated `CONTACT_REQUEST_RECIPIENT_EMAILS`
    env var, not guest input — and forwards the combined payload to
    `CONTACT_REQUEST_WEBHOOK_URL` (n8n). On success the form is replaced
-   with a thank-you note, scoped to that message only.
+   with a thank-you note, scoped to that message only. n8n looks up the
+   full `messages` history for the session (not just the single triggering
+   question) to build an AI-summarized email — see
+   [n8n-workflows.md](./n8n-workflows.md#contact-request-workflow-and-email-notification).
 7. Neither this app's Express backend nor its frontend persists the
    conversation anywhere — no message content, no transcript. The chat
    transcript in the browser lives only in frontend component state for

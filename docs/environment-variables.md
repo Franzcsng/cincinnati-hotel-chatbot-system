@@ -18,6 +18,7 @@ tracks the *names* and their purpose so the project stays reproducible.
 | `SUPABASE_SECRET_KEY` | Supabase service-role key — used server-side for Storage and DB writes that bypass RLS. **Backend only, never expose to the frontend.** |
 | `SUPABASE_JWKS_URL` | JWKS endpoint for verifying Supabase auth tokens. Not used yet (no auth implemented). |
 | `SUPABASE_STORAGE_BUCKET_NAME` | Storage bucket that PDF uploads are written to. |
+| `FRONTEND_URL` | Deployed frontend origin, added to the CORS allow-list alongside `http://localhost:5173` (hardcoded, always allowed). Optional locally; **required in production** — without it, the deployed frontend's requests get blocked by CORS. |
 
 ## `frontend/.env.local`
 

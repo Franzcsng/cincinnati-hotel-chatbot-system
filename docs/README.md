@@ -12,6 +12,7 @@ from the code.
 - [setup.md](./setup.md) — prerequisites, install, running the app locally
 - [architecture.md](./architecture.md) — tech stack, folder structure, routes, request flows
 - [api.md](./api.md) — backend API reference
+- [n8n-workflows.md](./n8n-workflows.md) — what the three n8n workflows actually do (PDF chunking, chat RAG, contact-request email), node-by-node
 - [environment-variables.md](./environment-variables.md) — every env var, what it's for, where it's used
 - [branding.md](./branding.md) — brand voice, color palettes, typography
 
@@ -43,3 +44,16 @@ from the code.
 respective n8n workflows. The backend only reads `messages` (filtered to
 `role = 'client'`) for `GET /api/stats`. See
 [architecture.md](./architecture.md#database-supabase).
+
+**Resolved:** the contact-request email used to only reach
+`recipient_emails[0]` and sent from Resend's sandbox domain — both fixed
+by switching to n8n's SMTP email node with a real sender address and the
+full recipient list. See [n8n-workflows.md](./n8n-workflows.md).
+
+**Open issue to fix before submission:** an attempted fix for
+`document_chunks.chunk_index` (previously always `0`) left a stray `"`
+character in the field expression, which will very likely error out the
+Supabase insert for every chunk — meaning **no chunks get saved at all**
+on the next PDF upload. See
+[n8n-workflows.md](./n8n-workflows.md#pdf-to-embedding-workflow) for the
+exact fix (remove the trailing `\"`).
