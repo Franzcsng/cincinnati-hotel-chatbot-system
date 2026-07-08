@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import './UploadPdfPage.css'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+
 function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -10,12 +12,16 @@ function formatFileSize(bytes) {
 function UploadPdfPage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [status, setStatus] = useState('idle') // idle | uploading | success | error
+  const [errorMessage, setErrorMessage] = useState('')
   const fileInputRef = useRef(null)
 
   function handleFiles(fileList) {
     const file = fileList?.[0]
     if (file && file.type === 'application/pdf') {
       setSelectedFile(file)
+      setStatus('idle')
+      setErrorMessage('')
     }
   }
 
@@ -23,6 +29,41 @@ function UploadPdfPage() {
     event.preventDefault()
     setIsDragging(false)
     handleFiles(event.dataTransfer.files)
+  }
+
+  function handleRemove() {
+    setSelectedFile(null)
+    setStatus('idle')
+    setErrorMessage('')
+  }
+
+  async function handleUpload() {
+    if (!selectedFile) return
+
+    setStatus('uploading')
+    setErrorMessage('')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+
+      const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Upload failed')
+      }
+
+      setStatus('success')
+      setSelectedFile(null)
+    } catch (error) {
+      setStatus('error')
+      setErrorMessage(error.message)
+    }
   }
 
   return (
@@ -62,18 +103,29 @@ function UploadPdfPage() {
               <span className="upload-file-name">{selectedFile.name}</span>
               <span className="upload-file-size">{formatFileSize(selectedFile.size)}</span>
             </div>
-            <button
-              type="button"
-              className="upload-remove-btn"
-              onClick={() => setSelectedFile(null)}
-            >
+            <button type="button" className="upload-remove-btn" onClick={handleRemove}>
               Remove
             </button>
           </div>
         )}
 
-        <button type="button" className="upload-submit-btn" disabled={!selectedFile}>
-          Upload Document
+        {status === 'success' && (
+          <p className="upload-status upload-status--success">
+            Document uploaded successfully. It is now the active knowledge base.
+          </p>
+        )}
+
+        {status === 'error' && (
+          <p className="upload-status upload-status--error">{errorMessage}</p>
+        )}
+
+        <button
+          type="button"
+          className="upload-submit-btn"
+          disabled={!selectedFile || status === 'uploading'}
+          onClick={handleUpload}
+        >
+          {status === 'uploading' ? 'Uploading...' : 'Upload Document'}
         </button>
       </div>
     </div>

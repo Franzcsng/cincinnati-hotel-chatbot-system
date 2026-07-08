@@ -83,6 +83,20 @@
   text-decoration: underline;
 }
 
+.upload-status {
+  margin-top: 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.upload-status--success {
+  color: var(--admin-success);
+}
+
+.upload-status--error {
+  color: var(--admin-danger);
+}
+
 .upload-submit-btn {
   margin-top: 1.5rem;
   border: none;
