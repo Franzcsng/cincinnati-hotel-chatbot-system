@@ -10,6 +10,42 @@
   line-height: 1.5;
 }
 
+.upload-active-doc {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background-color: var(--admin-bg);
+}
+
+.upload-active-doc-loading,
+.upload-active-doc-empty {
+  color: var(--admin-muted);
+  font-size: 0.85rem;
+}
+
+.upload-active-doc-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
+}
+
+.upload-active-doc-name {
+  font-weight: 600;
+  color: var(--admin-text);
+  font-size: 0.9rem;
+}
+
+.upload-active-doc-date {
+  color: var(--admin-muted);
+  font-size: 0.8rem;
+}
+
 .upload-dropzone {
   position: relative;
   border: 2px dashed #d1d5db;

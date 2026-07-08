@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './UploadPdfPage.css'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
@@ -9,12 +9,38 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function formatDate(isoString) {
+  return new Date(isoString).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
 function UploadPdfPage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [status, setStatus] = useState('idle') // idle | uploading | success | error
   const [errorMessage, setErrorMessage] = useState('')
+  const [activeDocument, setActiveDocument] = useState(null)
+  const [isLoadingActiveDocument, setIsLoadingActiveDocument] = useState(true)
   const fileInputRef = useRef(null)
+
+  const fetchActiveDocument = useCallback(async () => {
+    setIsLoadingActiveDocument(true)
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/active`)
+      const data = await response.json()
+      setActiveDocument(response.ok ? data.document : null)
+    } catch {
+      setActiveDocument(null)
+    } finally {
+      setIsLoadingActiveDocument(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchActiveDocument()
+  }, [fetchActiveDocument])
 
   function handleFiles(fileList) {
     const file = fileList?.[0]
@@ -60,6 +86,7 @@ function UploadPdfPage() {
 
       setStatus('success')
       setSelectedFile(null)
+      fetchActiveDocument()
     } catch (error) {
       setStatus('error')
       setErrorMessage(error.message)
@@ -73,8 +100,28 @@ function UploadPdfPage() {
       <div className="admin-card">
         <p className="upload-description">
           Upload the hotel information document that will serve as the knowledge base for
-          the AI assistant. Only PDF files are accepted.
+          the AI assistant. Only PDF files are accepted. Uploading a new document replaces
+          the current one.
         </p>
+
+        <div className="upload-active-doc">
+          {isLoadingActiveDocument ? (
+            <p className="upload-active-doc-loading">Checking active document...</p>
+          ) : activeDocument ? (
+            <>
+              <span className="upload-active-doc-label">Active document</span>
+              <span className="upload-active-doc-name">{activeDocument.filename}</span>
+              <span className="upload-active-doc-date">
+                Uploaded {formatDate(activeDocument.uploaded_at)}
+              </span>
+            </>
+          ) : (
+            <p className="upload-active-doc-empty">
+              No active document yet — the assistant has no knowledge base until one is
+              uploaded.
+            </p>
+          )}
+        </div>
 
         <div
           className={isDragging ? 'upload-dropzone upload-dropzone--active' : 'upload-dropzone'}
