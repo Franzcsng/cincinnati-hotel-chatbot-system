@@ -2,6 +2,14 @@ import { Router } from 'express'
 
 const router = Router()
 
+function parseRecipientEmails(raw) {
+  if (!raw) return []
+  return raw
+    .split(',')
+    .map((recipient) => recipient.trim())
+    .filter(Boolean)
+}
+
 router.post('/', async (req, res) => {
   const { session_id: sessionId, name, email, phone, topic, question } = req.body
 
@@ -15,6 +23,8 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ error: 'Contact requests are not configured yet' })
   }
 
+  const recipientEmails = parseRecipientEmails(process.env.CONTACT_REQUEST_RECIPIENT_EMAILS)
+
   try {
     const webhookResponse = await fetch(webhookUrl, {
       method: 'POST',
@@ -26,6 +36,7 @@ router.post('/', async (req, res) => {
         phone: phone || null,
         topic: topic || null,
         question: question || null,
+        recipient_emails: recipientEmails,
       }),
     })
 
